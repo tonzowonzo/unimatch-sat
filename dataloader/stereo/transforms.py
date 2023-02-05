@@ -172,6 +172,20 @@ class RandomContrast(object):
         return sample
 
 
+class Repeat(object):
+    """Repeat greyscale image n_repeats times"""
+
+    def __init__(self, n_repeats):
+
+        self.n_repeats = n_repeats
+
+    def __call__(self, sample):
+        sample["left"] = np.repeat(sample["left"], 3, axis=2)
+        sample["right"] = np.repeat(sample["right"], 3, axis=2)
+
+        return sample
+
+    
 class RandomGamma(object):
 
     def __init__(self,
