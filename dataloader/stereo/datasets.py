@@ -10,7 +10,8 @@ from . import transforms
 
 IMAGENET_MEAN = [0.485, 0.456, 0.406]
 IMAGENET_STD = [0.229, 0.224, 0.225]
-
+SAT_MEAN = [374]
+SAT_STD = [160]
 
 class StereoDataset(Dataset):
     def __init__(self,
@@ -633,6 +634,31 @@ class FallingThings(StereoDataset):
             self.samples.append(sample)
 
 
+class WhuStereo(StereoDataset):
+    def __init__(self,
+                 data_dir='datasets/whu_stereo',
+                 transform=None,
+                 ):
+        super(WhuStereo, self).__init__(transform=transform, is_whustereo=True)
+
+        # merge train and test
+        left_files = sorted(glob(data_dir + '/*/*/*left_*.tiff'))
+        right_files = sorted(glob(data_dir + '/*/*/*right_*.tiff'))
+        disp_files = sorted(glob(data_dir + '/*/*/*disparity_*.tiff'))
+
+        assert len(left_files) == len(right_files) == len(disp_files)
+        num_samples = len(left_files)
+
+        for i in range(num_samples):
+            sample = dict()
+
+            sample['left'] = left_files[i]
+            sample['right'] = right_files[i]
+            sample['disp'] = disp_files[i]
+
+            self.samples.append(sample)
+
+
 def build_dataset(args):
     if args.stage == 'sceneflow':
         train_transform_list = [transforms.RandomScale(crop_width=args.img_width),
@@ -738,6 +764,29 @@ def build_dataset(args):
                         100 * instereo2k + 2 * crestereo
 
         return train_dataset
+
+    elif args.stage == 'whu_stereo':
+        # dense gt with random resize augmentation
+        train_transform_list = [
+            transforms.Repeat(3),
+            transforms.RandomScale(max_scale=0.4,
+                                   crop_width=args.img_width),
+            transforms.RandomCrop(args.img_height, args.img_width),
+            transforms.RandomColor(),
+            transforms.RandomVerticalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=SAT_MEAN, std=SAT_STD)
+        ]
+
+        train_transform = transforms.Compose(train_transform_list)
+
+        # crestereo: 200000
+        whu_stereo = WhuStereo(transform=train_transform)
+
+        train_dataset = 10 * whu_stereo
+
+        return train_dataset
+
 
     elif args.stage == 'eth3d_ft':
         # dense gt with random resize augmentation
@@ -934,3 +983,4 @@ def build_dataset(args):
 
     else:
         raise NotImplementedError
+
